@@ -28,13 +28,18 @@ class Piwik_PurplePlugin_Controller extends Piwik_Controller
 //        exit;
         $view->init($this->pluginName, __FUNCTION__, 'PurplePlugin.getSessionTable');
         $view->setColumnsToDisplay(array('username','idpage','total_time'));
-        $view->setSortedColumn('username', 'asc');
         
         $view->setColumnTranslation('username', 'User Name');
         $view->setColumnTranslation('idpage', 'Page Number');
         $view->setColumnTranslation('total_time', 'Time Spent (ms)');
+        
+        $view->setSortedColumn('username', 'asc');
+        $view->setLimit(24);
+        $view->disableSearchBox();
         $view->disableRowEvolution();
-        $view->disableFooter();
+        $view->disableFooterIcons();
+        $view->disableExcludeLowPopulation();
+        
         return $this->renderView($view);
     }
             

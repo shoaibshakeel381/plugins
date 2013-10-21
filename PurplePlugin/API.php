@@ -29,19 +29,24 @@ class Piwik_PurplePlugin_API {
         return self::$instance;
     }
 
-    public function getSessionTable($idSite) {
+    public function getSessionTable($idSite, $date, $period) {
+        $result = $this->getdateRange($idSite, $date, $period);
+        $where = "AND visit_first_action_time >= '".$result[0]."' AND visit_first_action_time <= '".$result[1]. "'";
+        
+        $sample_array = array();
+//        $sample_array[] = array('username'=>$idSite, 'idpage'=>$date, 'total_time'=>$period);
+//        $sample_array[] = array('username'=>$idSite, 'idpage'=>$result[0], 'total_time'=>$result[1]);
+        
         //This is my code
         $query = "SELECT iduser, idpage ".
                 "FROM ".Piwik_Common::prefixTable('log_visit')." WHERE idsite = ". $idSite .
-                " AND (idpage!=0 AND idpage IS NOT NULL) GROUP BY iduser, idpage ".
+                " AND (idpage!=0 AND idpage IS NOT NULL) ". $where ." GROUP BY iduser, idpage ".
                 "ORDER BY iduser asc";
-        //printd($query);
+        printd($query);
         $result = Piwik_FetchAll($query); 
-        
         //return print_r($result, true);
         
         //now i am building an array of these results
-        $sample_array = array();
         $prevuserId = 0;
         $prevuserName = '';
         for($i=0; $i < count($result); $i++){
@@ -60,13 +65,63 @@ class Piwik_PurplePlugin_API {
         }
         
 //        return print_r($sample_array, true);
-
         $dataTable = new Piwik_DataTable();
-//        $dataTable->addRowsFromArrayWithIndexLabel($result);
         $dataTable->addRowsFromSimpleArray($sample_array);
         return $dataTable;
     }
     
+    /**
+     *  This function returns corrent start and end dates for result to view
+     * @param type $idSite  siteid
+     * @param type $date    selected date
+     * @param type $period  selected period
+     */
+    private function getdateRange($idSite, $date, $period){
+        ////////////////////////////////////////////////////
+        //this are ensure correct reults are fetched for selected period and date
+        $oSite = new Piwik_Site($idSite);
+        $result[0] = '';
+        $result[1] = '';
+        
+        if($period=='range'){       //then show result from dateStart to dateEnd
+            $newperiod = new Piwik_Period_Range($period, $date, $oSite->getTimezone());
+            $result[0] = $newperiod->getDateStart()->toString('Y-m-d'). " 00:00:00"; // eg. "2009-04-01"
+            $result[1] = $newperiod->getDateEnd()->toString('Y-m-d'). ' 23:59:59'; // eg. "2009-04-30"
+        } else if ($period=='day'){
+            $result[0] = $date;
+            $result[1] = $date;
+        } else {
+            $duedt = explode("-", $date);
+            $duedt  = mktime(0, 0, 0, $duedt[1], $duedt[2], $duedt[0]);
+
+            $week  = (int)date('W', $duedt);
+            $year = (int)date('Y', $duedt);
+            $month = (int)date('m', $duedt);
+            
+            if($period=='week'){
+                $date_string = $year . 'W' . sprintf('%02d', $week);
+                $result[0] = date('Y-m-d', strtotime($date_string));
+                $result[1] = date('Y-m-d', strtotime($date_string . '7'));
+            } else if($period=='month'){
+                $result[0] = date('Y-m-d', mktime(0, 0, 0, $month, 1, $year));
+                $result[1] = date('Y-m-t', mktime(0, 0, 0, $month, 1, $year));
+            } else if($period=='year'){
+                $result[0] = date('Y-m-d', mktime(0, 0, 0, 1, 1, $year));
+                $result[1] = date('Y-m-t', mktime(0, 0, 0, 12, 1, $year));
+            }
+        }
+        
+        $result[0] = $result[0]. " 00:00:00"; // eg. "2009-04-01"
+        $result[1] = $result[1]. ' 23:59:59'; // eg. "2009-04-30"
+        
+        return $result;
+    }
+    
+    /**
+     * return username from other sites db
+     * @param type $userId
+     * @return username or null
+     */
     private function getUserName($userId){
         $connect=NULL;
         
