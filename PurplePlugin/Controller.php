@@ -31,7 +31,7 @@ class Piwik_PurplePlugin_Controller extends Piwik_Controller
         
         $view->setColumnTranslation('username', 'User Name');
         $view->setColumnTranslation('idpage', 'Page Number');
-        $view->setColumnTranslation('total_time', 'Time Spent (ms)');
+        $view->setColumnTranslation('total_time', 'Time Spent (sec)');
         
         $view->setSortedColumn('username', 'asc');
         $view->setLimit(24);
@@ -39,68 +39,77 @@ class Piwik_PurplePlugin_Controller extends Piwik_Controller
         $view->disableRowEvolution();
         $view->disableFooterIcons();
         $view->disableExcludeLowPopulation();
-        
         return $this->renderView($view);
     }
-            
+    
+    /**
+     * Initialize custome template for graphs of time spent on each page by users
+     */
     function displayCustomTemplate()
     {
-        $view = Piwik_View::factory('PurpleGraph'); 
+        $view = Piwik_View::factory('PurpleGraph');
         $view->users = $this->getUsers();
         $view->pages = $this->getPages();
-        //$view->PurpleGraph1 = $this->displayGraph();
         
-        echo $view->render();
+        echo $view->render(); //echo
     }
     
-    function testGraph()
-    {
-        $userid = Piwik_Common::getRequestVar('userid', null, 'int');
-        $text = "You Fucking Selected <b>$userid</b> user";
-        echo $text;
-    }
     
+    /**
+     * This function will render graph whenever a new choice is made
+     * or widget loads for the first time
+     * @return type
+     */
     function displayGraph()
     {
         $view = Piwik_ViewDataTable::factory('graphVerticalBar');
         $view->init($this->pluginName, __FUNCTION__, 'PurplePlugin.getGraphData');
-        $view->setColumnTranslation('label', 'User Name');
-        $view->setColumnTranslation('total_time', 'Total Time (min)');
-//        $view->setColumnTranslation('value', "Temperature");
-        $view->setAxisYUnit(' min');
+        $view->setColumnTranslation('label', 'Page Number');
+        $view->setColumnTranslation('time_spent', 'Total Time (sec)');
+        $view->setAxisYUnit(' sec');
         $view->setSortedColumn('total_time', 'dsc');
-//        $view->setGraphLimit(5);
-//        $view->disableFooter();
+
+        $view->setGraphLimit(5);
+        $view->disableSearchBox();
+        $view->disableShowAllColumns();
+        $view->disableShowTable();
         return $this->renderView($view);
-//        $view->render();
     }
     
-    function getUsers()
+    private function getUsers()
     {
-        $query = "SELECT app_users.iduser as userid, app_users.username as username
-                    FROM app_users";
+        $res = array();
+        $connect=NULL;
+        
+        if(!($connect=mysql_connect('localhost', 'db_admin', 'super1'))){
+            return $res;
+        }
+        
+        if(!mysql_selectdb('plugin_users_db', $connect)){
+            return $res;
+        }
+        
+        $query="SELECT id, fname, lname FROM users";
+        $result = mysql_query($query, $connect);
+        if(mysql_num_rows($result)>0){
+            
+            while($val = mysql_fetch_assoc($result)){
+                $res[] = array('id'=>$val['id'], 'username'=>$val['fname'].' '.$val['lname']);
+            }
+        }
+        
+        return $res;
+    }
+    
+    private function getPages()
+    {
+        $idSite = Piwik_Common::getRequestVar('idSite', 0, 'int');
+        
+        $query = "SELECT DISTINCT(idpage) as pageid FROM ".Piwik_Common::prefixTable('log_visit')." WHERE idsite = ". $idSite .
+                " AND (idpage!=0 AND idpage IS NOT NULL)";
+        //printd($query);
         $results = Piwik_FetchAll($query);
 
         return $results;
-    }
-    
-    function getPages()
-    {
-        $query = "SELECT app_products.idpage as pageid, app_products.name as productname
-                    FROM app_products";
-        $results = Piwik_FetchAll($query);
-
-        return $results;
-    }
- 
-    function setSession()
-    {
-        $_SESSION['PurpleId'] = '03214';
-        $_SESSION['PurpleName'] = 'Cashif';
-    }
-
-    static private function boolToString($bool)
-    {
-        return $bool ? "true" : "false";
     }
 }

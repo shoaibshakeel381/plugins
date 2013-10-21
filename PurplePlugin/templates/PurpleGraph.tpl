@@ -35,7 +35,7 @@ Select User:
     <select id="userid">
         <option value="0">All Users</option>
         {foreach from=$users item=user}
-            <option value="{$user.userid}">{$user.username}</option>
+            <option value="{$user.id}">{$user.username}</option>
         {/foreach}        
     </select>
 Select Page:
