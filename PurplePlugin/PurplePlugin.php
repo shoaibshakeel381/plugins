@@ -15,6 +15,7 @@
  */
 class Piwik_PurplePlugin extends Piwik_Plugin
 {
+    public static $working = false;    //this is used to synchronize time update with page visits
     /**
      * Return information about this plugin.
      *
@@ -42,6 +43,7 @@ class Piwik_PurplePlugin extends Piwik_Plugin
         return array(
 //	    'Controller.renderView' => 'addUniqueVisitorsColumnToGivenReport',
             'Tracker.newVisitorInformation' => 'logNewVisitInfo',
+            'Tracker.saveVisitorInformation.end' => 'loggedNewVisitInfo',
             'Tracker.knownVisitorUpdate' => 'logKnwonVisitInfo',
             'Tracker.knownVisitorInformation' => 'correctKnwonVisitInfo',
             'WidgetsList.add' => 'addWidgets',
@@ -83,15 +85,16 @@ class Piwik_PurplePlugin extends Piwik_Plugin
      * Function to log userid and productid into database for a new visitor
      */
     function logNewVisitInfo($notification) {
+        $this->working = true;
         $this->customizedUpdate = 0;          //totaly unnecessary
-        //printd("PurplePlugin: New Visitor: called!!");
+        printd("PurplePlugin: New Visitor: called!!");
         $visitorInfo = & $notification->getNotificationObject();
         // Access data variable that contains iduser and idpage
         try{
             $customdata = Piwik_Common::getRequestVar('data');
         }  catch(Exception $ex){
-            //printd("PurplePlugin: Visitor: Exception Handled");
-            //printd("===================================================================");
+            printd("PurplePlugin: Visitor: Exception Handled (No Custom Data)");
+            printd("===================================================================");
             return;
         }
         
@@ -108,18 +111,23 @@ class Piwik_PurplePlugin extends Piwik_Plugin
         $idSite = isset($customdata[2]) ? $customdata[2] : $visitorInfo['idsite'];
 
         if($iduser == NULL || $idpage == NULL){
-            //printd("Visit is not on document page");
-            //printd("===================================================================");
+            printd("Visit is not on document page");
+            printd("===================================================================");
             return;
         } else{
-            //printd("Visit is on document page");
+            printd("Visit is on document page");
         } //else visit is on a document page so log it.
         
         $visitorInfo['iduser'] = $iduser;
         $visitorInfo['idpage'] = $idpage;
         $visitorInfo['pagetime'] = 0;       //sets page time to zero
-        ////printd("This is the visitorInfo:\n". var_export($visitorInfo, true));
-        //printd("===================================================================");
+        //printd("This is the visitorInfo:\n". var_export($visitorInfo, true));
+    }
+    
+    function loggedNewVisitInfo($notification){
+        printd("New Visitor Information was logged");
+        $this->working = false;
+        printd("===================================================================");
     }
     
     
@@ -139,17 +147,18 @@ class Piwik_PurplePlugin extends Piwik_Plugin
      * @param type $notification contains visitorInfo
      */
     function logKnwonVisitInfo($notification) {
+        $this->working = true;
         $this->customizedUpdate = 0;;
-        //printd("PurplePlugin: KNWON Visitor: called!!");
+        printd("PurplePlugin: KNWON Visitor: called!!");
         $visitorInfo = & $notification->getNotificationObject();
-//        //printd("This is the visitorInfo:\n". var_export($visitorInfo, true));
+//        printd("This is the visitorInfo:\n". var_export($visitorInfo, true));
 
         // Access data variable that contains iduser and idpage
         try{
             $customdata = Piwik_Common::getRequestVar('data');
         }  catch(Exception $ex){
-            //printd("PurplePlugin: Visitor: Exception Handled");
-            //printd("===================================================================");
+            printd("PurplePlugin: Visitor: Exception Handled (No Custom Data)");
+            printd("===================================================================");
             return;
         }
         
@@ -157,7 +166,7 @@ class Piwik_PurplePlugin extends Piwik_Plugin
         $customdata = preg_replace("/[^a-zA-Z0-9,]+/", "", html_entity_decode($customdata, ENT_QUOTES));
         // Split the data by delimiter 'comma'
         $customdata = explode(',', $customdata);
-        printd("[Purple Plugin] Found Custom Data: \n" . var_export($customdata, true));
+        //printd("[Purple Plugin] Found Custom Data: \n" . var_export($customdata, true));
         //First number is iduser
         $iduser = isset($customdata[0]) ? $customdata[0] : null;
         //Second Number is idpage
@@ -166,18 +175,22 @@ class Piwik_PurplePlugin extends Piwik_Plugin
         $idSite = isset($customdata[2]) ? $customdata[2] : 1;
 
         if($iduser == NULL || $idpage == NULL){
-            //printd("Visit is not on document page");
-            //printd("===================================================================");
+            printd("Visit is not on document page");
+            printd("===================================================================");
             return;
         } else{
-            //printd("Visit is on document page");
+            printd("Visit is on document page");
         } //else visit is on a document page so log it.
         
+        //these values are accessed in creating new row after update finishes
+        $visitorInfo['iduser'] = $iduser;
+        $visitorInfo['idpage'] = $idpage;
+        $visitorInfo['pagetime'] = 0;
         
         //select the row which is going to be updated and backup its data
         $query = "SELECT * FROM `".Piwik_Common::prefixTable('log_visit').
                 "` WHERE `idsite`={$idSite} AND `idvisitor`=x'".bin2hex($visitorInfo['idvisitor']).
-                "' ORDER BY `visit_last_action_time` DESC";
+                "' ORDER BY `visit_last_action_time` DESC LIMIT 1";
         ////printd("This is the query: ".$query);
         $this->rowBackup = Piwik_FetchAll($query);
         
@@ -191,7 +204,7 @@ class Piwik_PurplePlugin extends Piwik_Plugin
         //           if last action was beyond 30mins set reviewUpdate true
         $query = "SELECT * FROM `".Piwik_Common::prefixTable('log_visit').
                 "` WHERE `idsite`={$idSite} AND `idvisitor`=x'".bin2hex($visitorInfo['idvisitor']).
-                "' AND `idpage`={$idpage} AND `iduser`={$iduser} ORDER BY `visit_last_action_time` DESC";
+                "' AND `idpage`={$idpage} AND `iduser`={$iduser} ORDER BY `visit_last_action_time` DESC LIMIT 1";
         
         ////printd("This is the query: ".$query);
         $this->currentrow = Piwik_FetchAll($query);
@@ -199,36 +212,35 @@ class Piwik_PurplePlugin extends Piwik_Plugin
         if(count($this->currentrow[0])>0){
             //row is present
             if($this->rowBackup[0]['idvisit']==$this->currentrow[0]['idvisit']){
-                ////printd('same row is selected for update operation');
+                printd('same row is selected for update operation');
             }else {
-                //printd("row is present but is not the row which should be updated");
+                printd("row is present but is not the row which should be updated");
                 $lastactiontime = $this->currentrow[0]['visit_last_action_time'];
                 if($lastactiontime > (time()-Piwik_Config::getInstance()->Tracker['visit_standard_length'])){
-                    //printd("sesion expired so create new row");
+                    printd("sesion expired so create new row");
                     $this->customizedUpdate = 1;
                 } else{
-                    //printd("session is not expired so do not create new row. update this row");
+                    printd("session is not expired so do not create new row. update this row");
                     $this->customizedUpdate = 2;
+                    $visitorInfo['pagetime'] = $this->currentrow[0]['pagetime'];
+                    printd("pagetime of current row is: ".$visitorInfo['pagetime']);
                 }
             }
         }else{
-            //printd("row is not present");
+            printd("row is not present");
             $this->customizedUpdate = 1;
         }
-        //these values are accessed in creating new row after update finishes
-        $visitorInfo['iduser'] = $iduser;
-        $visitorInfo['idpage'] = $idpage;
-        $visitorInfo['pagetime'] = 0;
-        //printd("===================================================================");
+        
+        printd("===================================================================");
     }
     
     function correctKnwonVisitInfo($notification) {
-        //printd("PurplePlugin: UPDATED KNOWN Visitor called!!");
+        printd("PurplePlugin: UPDATED KNOWN Visitor called!!");
         $visitorInfo = & $notification->getNotificationObject();
 //        //printd("This is the visitorInfo:\n". var_export($visitorInfo, true));
         
         if($this->customizedUpdate===1){
-            //printd("different row was updated so we need to change information");
+            printd("different row was updated so we need to change information");
             
             //First fetch new data and insert it into new row.
             $query = "SELECT * FROM `".Piwik_Common::prefixTable('log_visit').
@@ -236,7 +248,7 @@ class Piwik_PurplePlugin extends Piwik_Plugin
             
             //printd('The First Select query is: '.$query);
             $result = Piwik_FetchAll($query);
-            //printd("Values USERID:".$result[0]['iduser']." PAGEID:".$result[0]['idpage']." VISITID:".$result[0]['idvisit']);
+            printd("Values USERID:".$result[0]['iduser']." PAGEID:".$result[0]['idpage']." VISITID:".$result[0]['idvisit']);
             //this will build up query to execute
             $set = "";
             foreach($result[0] as $key => $value){
@@ -254,9 +266,9 @@ class Piwik_PurplePlugin extends Piwik_Plugin
             $q = "INSERT INTO `".Piwik_Common::prefixTable('log_visit')."` SET {$set}";
             ////printd($q);
             if(Piwik_Query($q)>0){
-                //printd("Query executed and data inerted into table");
+                printd("Query executed and data inerted into table");
             } else{
-                //printd("Query not executed and data not inerted into table");
+                printd("Query not executed and data not inerted into table");
             }
             
             //after inserting data into new row we need to restor reviouslt updated row
@@ -280,14 +292,14 @@ class Piwik_PurplePlugin extends Piwik_Plugin
             $q = "UPDATE `".Piwik_Common::prefixTable('log_visit')."` SET {$set} WHERE `idvisit`={$prevRow}";
             ////printd($q);
             if(Piwik_Query($q)>0){
-                //printd("Query executed and data updated into table");
+                printd("Query executed and data updated into table");
             } else{
-                //printd("Query not executed and data not updated into table");
+                printd("Query not executed and data not updated into table");
             }
-            //printd("new row operation completed.");
+            printd("new row operation completed.");
         }else if($this->customizedUpdate===2){
             //we have to update current row instead of creating new row
-            //printd("different row was updated so we need to change information");
+            printd("different row was updated so we need to change information");
             
             //First fetch new data and insert it into new row.
             $query = "SELECT * FROM `".Piwik_Common::prefixTable('log_visit').
@@ -309,12 +321,12 @@ class Piwik_PurplePlugin extends Piwik_Plugin
             $q = "UPDATE `".Piwik_Common::prefixTable('log_visit')."` SET {$set} WHERE `idvisit`='{$this->currentrow[0]['idvisit']}'";
             //printd($q);
             if(Piwik_Query($q)>0){
-                //printd("Query executed and data inerted into table");
+                printd("Query executed and data inerted into table");
             } else{
-                //printd("Query not executed and data not inerted into table");
+                printd("Query not executed and data not inerted into table");
             }
             
-            //after inserting data into already present row we need to restor reviouslt updated row
+            //after inserting data into already present row we need to restor previousiy updated row
             //this will build up update query
             $set = "";
             foreach($this->rowBackup[0] as $key => $value){
@@ -333,15 +345,16 @@ class Piwik_PurplePlugin extends Piwik_Plugin
             $q = "UPDATE `".Piwik_Common::prefixTable('log_visit')."` SET {$set} WHERE `idvisit`={$visitorInfo['idvisit']}";
             ////printd($q);
             if(Piwik_Query($q)>0){
-                //printd("Query executed and data updated into table");
+                printd("Query executed and data updated into table");
             } else{
-                //printd("Query not executed and data not updated into table");
+                printd("Query not executed and data not updated into table");
             }
-            //printd("row update operation completed.");
+            printd("row update operation completed.");
         }else{
-            //printd("same row was updated so no need to change anything");
+            printd("same row was updated so no need to change anything");
         }
-        //printd("===================================================================");
+        $this->working = false;
+        printd("===================================================================");
     }
     
     function addWidgets()

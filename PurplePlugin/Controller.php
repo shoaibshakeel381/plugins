@@ -34,7 +34,7 @@ class Piwik_PurplePlugin_Controller extends Piwik_Controller
         $view->setColumnTranslation('total_time', 'Time Spent (sec)');
         
         $view->setSortedColumn('username', 'asc');
-        $view->setLimit(24);
+        $view->setLimit(10);
         $view->disableSearchBox();
         $view->disableRowEvolution();
         $view->disableFooterIcons();
@@ -69,7 +69,7 @@ class Piwik_PurplePlugin_Controller extends Piwik_Controller
         $view->setAxisYUnit(' sec');
         $view->setSortedColumn('total_time', 'dsc');
 
-        $view->setGraphLimit(5);
+        $view->setGraphLimit(10);
         $view->disableSearchBox();
         $view->disableShowAllColumns();
         $view->disableShowTable();
@@ -111,5 +111,31 @@ class Piwik_PurplePlugin_Controller extends Piwik_Controller
         $results = Piwik_FetchAll($query);
 
         return $results;
+    }
+    
+    function ping(){
+        $iduser = Piwik_Common::getRequestVar('userid', 0, 'int');
+        $idSite = Piwik_Common::getRequestVar('siteid', 0, 'int');
+        $idpage = Piwik_Common::getRequestVar('pageid', 0, 'int');
+        $time = Piwik_Common::getRequestVar('time', 0, 'int');
+        
+        printd(Piwik_PurplePlugin::$working?"true":"false");
+        while(Piwik_PurplePlugin::$working);
+        printd(Piwik_PurplePlugin::$working?"true":"false");
+        $query = "SELECT idvisit, pagetime FROM ".Piwik_Common::prefixTable('log_visit')
+                ." WHERE idsite = {$idSite} AND iduser={$iduser} AND idpage={$idpage} ORDER BY visit_last_action_time DESC LIMIT 1";
+        //echo "\n".$query;
+        $result = Piwik_FetchAll($query);
+        if(count($result)>0){
+            $totalTime = (int) $result[0]['pagetime'] + $time;
+            $query = "UPDATE ".Piwik_Common::prefixTable('log_visit')
+                    ." SET pagetime={$totalTime} WHERE idvisit={$result[0]['idvisit']} LIMIT 1";
+            //echo "\n".$query;
+            echo Piwik_Exec($query);
+            printd('done');
+        }else {
+            printd("row wasn\'t present");
+        }
+        exit;
     }
 }

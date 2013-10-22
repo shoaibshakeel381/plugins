@@ -88,6 +88,9 @@ class Piwik_PurplePlugin_API {
             $result[0] = $newperiod->getDateStart()->toString('Y-m-d'). " 00:00:00"; // eg. "2009-04-01"
             $result[1] = $newperiod->getDateEnd()->toString('Y-m-d'). ' 23:59:59'; // eg. "2009-04-30"
         } else if ($period=='day'){
+            if($date=='yesterday'){
+                $date = date('Y-m-d', strtotime($date));
+            }
             $result[0] = $date;
             $result[1] = $date;
         } else {
@@ -148,7 +151,7 @@ class Piwik_PurplePlugin_API {
         $userid = Piwik_Common::getRequestVar('userid', 0, 'int');
         $pageid = Piwik_Common::getRequestVar('pageid', 0, 'int');
 
-        printd(" -- userid : " . $userid . " -- pageid:". $pageid);
+//        printd(" -- userid : " . $userid . " -- pageid:". $pageid);
 
         $query = "SELECT idpage as label, SUM(pagetime) as time_spent FROM ".Piwik_Common::prefixTable('log_visit')." WHERE ";
         $where2 = " idsite ={$idSite} AND visit_first_action_time >= '".$result[0]."' AND visit_first_action_time <= '".$result[1]. "'";
@@ -167,7 +170,7 @@ class Piwik_PurplePlugin_API {
             $groupBy = " GROUP BY idpage";
         }
         $query .= $where1 . $where2 . $groupBy;
-        printd($query);
+        //printd($query);
         $result = Piwik_FetchAll($query);
         $dataTable = new Piwik_DataTable();
         $dataTable->addRowsFromSimpleArray($result);
