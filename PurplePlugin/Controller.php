@@ -81,7 +81,7 @@ class Piwik_PurplePlugin_Controller extends Piwik_Controller
         $res = array();
         $connect=NULL;
         
-        if(!($connect=mysql_connect('localhost', 'db_admin', 'super1'))){
+        if(!($connect=mysql_connect('localhost', 'root', ''))){
             return $res;
         }
         

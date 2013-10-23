@@ -128,7 +128,7 @@ class Piwik_PurplePlugin_API {
     private function getUserName($userId){
         $connect=NULL;
         
-        if(!($connect=mysql_connect('localhost', 'db_admin', 'super1'))){
+        if(!($connect=mysql_connect('localhost', 'root', ''))){
             return null;
         }
         
