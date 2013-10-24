@@ -26,13 +26,13 @@ class Piwik_PurplePlugin extends Piwik_Plugin
     public function getInformation()
     {
         return array(
-            'description'          => 'PurplePlugin | An Experimental Plugin',
+            'description'          => 'Custom plugin to track time spent on pages',
             'homepage'             => 'http://www.purplefellows.com/',
             'author'               => 'Shoaib Shakeel',
             'author_homepage'      => 'mailto:shoaib.shakeel@purplefellows.com',
             'license'              => 'GPL v3 or later',
             'license_homepage'     => 'http://www.gnu.org/licenses/gpl.html',
-            'version'              => '0.1',
+            'version'              => '1.0',
             'translationAvailable' => false,
             'TrackerPlugin'   => true, // this plugin must be loaded during the stats logging
         );
@@ -41,7 +41,6 @@ class Piwik_PurplePlugin extends Piwik_Plugin
     public function getListHooksRegistered()
     {
         return array(
-//	    'Controller.renderView' => 'addUniqueVisitorsColumnToGivenReport',
             'Tracker.newVisitorInformation' => 'logNewVisitInfo',
             'Tracker.saveVisitorInformation.end' => 'loggedNewVisitInfo',
             'Tracker.knownVisitorUpdate' => 'logKnwonVisitInfo',
@@ -76,9 +75,17 @@ class Piwik_PurplePlugin extends Piwik_Plugin
         // Executed every time plugin is Enabled
     }
 
-    function deactivate()
+    function addWidgets()
     {
-        // Executed every time plugin is disabled
+        // we register the widgets so they appear in the "Add a new widget" window in the dashboard
+        // Note that the first two parameters can be either a normal string, or an index to a translation string
+        Piwik_AddWidget('Custom Widgets', 'Tabular View', 'PurplePlugin', 'displaySession');
+        Piwik_AddWidget('Custom Widgets', 'Graphical View', 'PurplePlugin', 'displayCustomTemplate');
+    }
+    
+    function addMenu()
+    {
+        Piwik_AddMenu('General_Visitors', 'Purple Plugin', array('module' => 'PurplePlugin', 'action' => 'displayCustomTemplate'));
     }
     
     /**
@@ -355,18 +362,5 @@ class Piwik_PurplePlugin extends Piwik_Plugin
         }
         $this->working = false;
         printd("===================================================================");
-    }
-    
-    function addWidgets()
-    {
-        // we register the widgets so they appear in the "Add a new widget" window in the dashboard
-        // Note that the first two parameters can be either a normal string, or an index to a translation string
-        Piwik_AddWidget('purpleWidgets', 'Purple Widget', 'PurplePlugin', 'displaySession');
-        Piwik_AddWidget('purpleWidgets', 'Purple Graph', 'PurplePlugin', 'displayCustomTemplate');
-    }
-    
-    function addMenu()
-    {
-        Piwik_AddMenu('General_Visitors', 'Purple Plugin', array('module' => 'PurplePlugin', 'action' => 'displayCustomTemplate'));
     }
 }

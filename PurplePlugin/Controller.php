@@ -50,7 +50,6 @@ class Piwik_PurplePlugin_Controller extends Piwik_Controller
         $view = Piwik_View::factory('PurpleGraph');
         $view->users = $this->getUsers();
         $view->pages = $this->getPages();
-        
         echo $view->render(); //echo
     }
     

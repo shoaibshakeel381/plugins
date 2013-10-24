@@ -25,9 +25,9 @@
     {/literal}
 </script>
 
-<div style="padding:1.5em;text-align:center">
-
+<div style="padding:1em;">
 </div>
+
 <div id="GraphArea">
 </div>
 
