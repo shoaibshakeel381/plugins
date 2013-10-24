@@ -32,14 +32,14 @@
 </div>
 
 Select User:
-    <select id="userid">
-        <option value="0">All Users</option>
+    <select id="userid" style="width:130px">
+        <option value="All">All Users</option>
         {foreach from=$users item=user}
-            <option value="{$user.id}">{$user.username}</option>
+            <option value="{$user.user}">{$user.user}</option>
         {/foreach}        
     </select>
 Select Page:
-    <select id="pageid">
+    <select id="pageid" style="width:95px">
         <option value="0">All Pages</option>
         {foreach from=$pages item=page}
             <option value="{$page.pageid}">{$page.pageid}</option>

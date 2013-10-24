@@ -23,9 +23,6 @@ class Piwik_PurplePlugin_Controller extends Piwik_Controller
     function displaySession()
     {
         $view = Piwik_ViewDataTable::factory('table');
-//        $obj = new Piwik_PurplePlugin_API();
-//        echo $obj->getSessionTable(1);
-//        exit;
         $view->init($this->pluginName, __FUNCTION__, 'PurplePlugin.getSessionTable');
         $view->setColumnsToDisplay(array('username','idpage','total_time'));
         
@@ -53,7 +50,6 @@ class Piwik_PurplePlugin_Controller extends Piwik_Controller
         echo $view->render(); //echo
     }
     
-    
     /**
      * This function will render graph whenever a new choice is made
      * or widget loads for the first time
@@ -77,35 +73,22 @@ class Piwik_PurplePlugin_Controller extends Piwik_Controller
     
     private function getUsers()
     {
-        $res = array();
-        $connect=NULL;
+        $idSite = Piwik_Common::getRequestVar('idSite', 0, 'int');
         
-        if(!($connect=mysql_connect('localhost', 'root', ''))){
-            return $res;
-        }
-        
-        if(!mysql_selectdb('plugin_users_db', $connect)){
-            return $res;
-        }
-        
-        $query="SELECT id, fname, lname FROM users";
-        $result = mysql_query($query, $connect);
-        if(mysql_num_rows($result)>0){
-            
-            while($val = mysql_fetch_assoc($result)){
-                $res[] = array('id'=>$val['id'], 'username'=>$val['fname'].' '.$val['lname']);
-            }
-        }
-        
-        return $res;
+        $query = "SELECT DISTINCT(iduser) as user FROM ".Piwik_Common::prefixTable('log_visit')." WHERE idsite='{$idSite}' ".
+                "AND iduser!='0'";
+        //printd($query);
+        $results = Piwik_FetchAll($query);
+
+        return $results;
     }
     
     private function getPages()
     {
         $idSite = Piwik_Common::getRequestVar('idSite', 0, 'int');
         
-        $query = "SELECT DISTINCT(idpage) as pageid FROM ".Piwik_Common::prefixTable('log_visit')." WHERE idsite = ". $idSite .
-                " AND (idpage!=0 AND idpage IS NOT NULL)";
+        $query = "SELECT DISTINCT(idpage) as pageid FROM ".Piwik_Common::prefixTable('log_visit')." WHERE idsite='{$idSite}' ".
+                "AND idpage!=0";
         //printd($query);
         $results = Piwik_FetchAll($query);
 
@@ -113,27 +96,27 @@ class Piwik_PurplePlugin_Controller extends Piwik_Controller
     }
     
     function ping(){
-        $iduser = Piwik_Common::getRequestVar('userid', 0, 'int');
+        $iduser = Piwik_Common::getRequestVar('userid', 0);
         $idSite = Piwik_Common::getRequestVar('siteid', 0, 'int');
         $idpage = Piwik_Common::getRequestVar('pageid', 0, 'int');
         $time = Piwik_Common::getRequestVar('time', 0, 'int');
         
-        printd(Piwik_PurplePlugin::$working?"true":"false");
-        while(Piwik_PurplePlugin::$working);
+        //printd(Piwik_PurplePlugin::$working?"true":"false");
+        while(Piwik_PurplePlugin::$working){}
         printd(Piwik_PurplePlugin::$working?"true":"false");
         $query = "SELECT idvisit, pagetime FROM ".Piwik_Common::prefixTable('log_visit')
-                ." WHERE idsite = {$idSite} AND iduser={$iduser} AND idpage={$idpage} ORDER BY visit_last_action_time DESC LIMIT 1";
+                ." WHERE idsite='{$idSite}' AND iduser='{$iduser}' AND idpage='{$idpage}' ORDER BY visit_last_action_time DESC LIMIT 1";
         //echo "\n".$query;
         $result = Piwik_FetchAll($query);
         if(count($result)>0){
             $totalTime = (int) $result[0]['pagetime'] + $time;
             $query = "UPDATE ".Piwik_Common::prefixTable('log_visit')
-                    ." SET pagetime={$totalTime} WHERE idvisit={$result[0]['idvisit']} LIMIT 1";
+                    ." SET pagetime='{$totalTime}' WHERE idvisit='{$result[0]['idvisit']}' LIMIT 1";
             //echo "\n".$query;
             echo Piwik_Exec($query);
             printd('done');
         }else {
-            printd("row wasn\'t present");
+            printd("row wasn't present");
         }
         exit;
     }

@@ -34,37 +34,29 @@ class Piwik_PurplePlugin_API {
         $where = "AND visit_first_action_time >= '".$result[0]."' AND visit_first_action_time <= '".$result[1]. "'";
         
         $sample_array = array();
-//        $sample_array[] = array('username'=>$idSite, 'idpage'=>$date, 'total_time'=>$period);
-//        $sample_array[] = array('username'=>$idSite, 'idpage'=>$result[0], 'total_time'=>$result[1]);
+        //$sample_array[] = array('username'=>$idSite, 'idpage'=>$date, 'total_time'=>$period);
+        //$sample_array[] = array('username'=>$idSite, 'idpage'=>$result[0], 'total_time'=>$result[1]);
         
         //This is my code
         $query = "SELECT iduser, idpage ".
-                "FROM ".Piwik_Common::prefixTable('log_visit')." WHERE idsite = ". $idSite .
-                " AND (idpage!=0 AND idpage IS NOT NULL) ". $where ." GROUP BY iduser, idpage ".
+                "FROM ".Piwik_Common::prefixTable('log_visit')." WHERE idsite='{$idSite}' ".
+                "AND idpage!='0' AND iduser!='0' ". $where ." GROUP BY iduser, idpage ".
                 "ORDER BY iduser asc";
-//        printd($query);
+        printd($query);
         $result = Piwik_FetchAll($query); 
         //return print_r($result, true);
         
         //now i am building an array of these results
-        $prevuserId = 0;
-        $prevuserName = '';
+        
         for($i=0; $i < count($result); $i++){
-            //we want to optimize number of db requests. So if a repeated user appears
-            //use previously found username
-            //for this to work we have to order the result by iduser
-            if($result[$i]['iduser'] != $prevuserId){
-                $temp = $this->getUserName($result[$i]['iduser']);
-                $prevuserName = $temp!=null ? $temp : $result[$i]['iduser'];
-            }
-            $q = "SELECT SUM(pagetime) as time_spent FROM ".Piwik_Common::prefixTable('log_visit')." WHERE idsite = ". $idSite .
-                " AND idpage={$result[$i]['idpage']} AND iduser={$result[$i]['iduser']}";
+            $q = "SELECT SUM(pagetime) as time_spent FROM ".Piwik_Common::prefixTable('log_visit')." WHERE idsite ='{$idSite}'".
+                " AND idpage='{$result[$i]['idpage']}' AND iduser='{$result[$i]['iduser']}'";
             //printd($q);
             $timeSpent = Piwik_FetchAll($q);
-            $sample_array[] = array('username'=>$prevuserName, 'idpage'=>$result[$i]['idpage'], 'total_time'=>$timeSpent[0]['time_spent']);
+            $sample_array[] = array('username'=>$result[$i]['iduser'], 'idpage'=>$result[$i]['idpage'], 'total_time'=>$timeSpent[0]['time_spent']);
         }
         
-//        return print_r($sample_array, true);
+        //return print_r($sample_array, true);
         $dataTable = new Piwik_DataTable();
         $dataTable->addRowsFromSimpleArray($sample_array);
         return $dataTable;
@@ -120,49 +112,23 @@ class Piwik_PurplePlugin_API {
         return $result;
     }
     
-    /**
-     * return username from other sites db
-     * @param type $userId
-     * @return username or null
-     */
-    private function getUserName($userId){
-        $connect=NULL;
-        
-        if(!($connect=mysql_connect('localhost', 'root', ''))){
-            return null;
-        }
-        
-        if(!mysql_selectdb('plugin_users_db', $connect)){
-            return null;
-        }
-        
-        $query="SELECT fname, lname FROM users WHERE id={$userId} LIMIT 1";
-        $result = mysql_query($query, $connect);
-        if(mysql_num_rows($result)>0){
-            $res = mysql_fetch_assoc($result);
-            return $res['fname'] .' '. $res['lname'];
-        }
-        
-        return null;
-    }
-
     public function getGraphData($idSite, $date, $period) {
         $result = $this->getdateRange($idSite, $date, $period);
-        $userid = Piwik_Common::getRequestVar('userid', 0, 'int');
+        $userid = Piwik_Common::getRequestVar('userid', "All");
         $pageid = Piwik_Common::getRequestVar('pageid', 0, 'int');
 
-//        printd(" -- userid : " . $userid . " -- pageid:". $pageid);
+        //printd(" -- userid : '" . $userid . "' -- pageid:". $pageid);
 
         $query = "SELECT idpage as label, SUM(pagetime) as time_spent FROM ".Piwik_Common::prefixTable('log_visit')." WHERE ";
-        $where2 = " idsite ={$idSite} AND visit_first_action_time >= '".$result[0]."' AND visit_first_action_time <= '".$result[1]. "'";
+        $where2 = " idsite='{$idSite}' AND visit_first_action_time >= '".$result[0]."' AND visit_first_action_time <= '".$result[1]. "'";
         $where1 = '';   //conditions for result
         $groupBy = " GROUP BY iduser, idpage";  //group by part of query
         
-        if ($userid != 0 && $pageid != 0) {
-             $where1 .= "iduser={$userid} AND idpage={$pageid} AND";
-        } else if ($userid != 0 && $pageid == 0) {
-            $where1 = "iduser = {$userid} AND";
-       } else if ($userid == 0 && $pageid != 0) {
+        if ($userid != "All" && $pageid != 0) {
+             $where1 .= "iduser='{$userid}' AND idpage='{$pageid}' AND";
+        } else if ($userid != "All" && $pageid == 0) {
+            $where1 = "iduser='{$userid}' AND";
+       } else if ($userid == "All" && $pageid != 0) {
             $where1 = "idpage={$pageid} AND";
             $groupBy = " GROUP BY idpage";
         } else {
@@ -170,7 +136,7 @@ class Piwik_PurplePlugin_API {
             $groupBy = " GROUP BY idpage";
         }
         $query .= $where1 . $where2 . $groupBy;
-        //printd($query);
+        printd($query);
         $result = Piwik_FetchAll($query);
         $dataTable = new Piwik_DataTable();
         $dataTable->addRowsFromSimpleArray($result);

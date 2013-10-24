@@ -53,20 +53,18 @@ class Piwik_PurplePlugin extends Piwik_Plugin
     public function install()
     {
       // add column for userid and productname
-      $query = "ALTER IGNORE TABLE `".Piwik_Common::prefixTable('log_visit')."` " .
-                       "ADD `iduser` INT NULL, ".
-                       "ADD `idpage` INT NULL, ".
-                       "ADD `pagetime` INT NULL";
+      $query = "ALTER IGNORE TABLE `" . Piwik_Common::prefixTable('log_visit') . "` " .
+                "ADD `iduser` VARCHAR( 30 ) NOT NULL DEFAULT '0', " .
+                "ADD `idpage` INT NOT NULL DEFAULT '0', " .
+                "ADD `pagetime` INT NOT NULL DEFAULT '0'";
 
-      // if the column already exist do not throw error. Could be installed twice...
-      try 
-      {
-        Piwik_Exec($query);
-      }
-      catch(Exception $e){
-          //printd('Error in MYSQL query during activation or install');
-          //printd("Query was : ".$query);
-      }
+        // if the column already exist do not throw error. Could be installed twice...
+        try {
+            Piwik_Exec($query);
+        } catch (Exception $e) {
+            //printd('Error in MYSQL query during activation or install');
+            //printd("Query was : ".$query);
+        }
     }
 
     function activate()
@@ -106,18 +104,16 @@ class Piwik_PurplePlugin extends Piwik_Plugin
         }
         
         // Remove Quotes from string
-        $customdata = preg_replace("/[^a-zA-Z0-9,]+/", "", html_entity_decode($customdata, ENT_QUOTES));
+        $customdata = preg_replace("/[^a-zA-Z0-9, ]+/", "", html_entity_decode($customdata, ENT_QUOTES));
         // Split the data by delimiter 'comma'
         $customdata = explode(',', $customdata);
         printd("[Purple Plugin] Found Custom Data: \n" . var_export($customdata, true));
         //First number is iduser
-        $iduser = isset($customdata[0]) ? $customdata[0] : null;
+        $iduser = isset($customdata[0]) ? mysql_real_escape_string($customdata[0]) : '';
         //Second Number is idpage
-        $idpage = isset($customdata[1]) ? $customdata[1] : null;
-        //This is the siteId
-        $idSite = isset($customdata[2]) ? $customdata[2] : $visitorInfo['idsite'];
+        $idpage =  isset($customdata[1]) ? (int) $customdata[1] : 0;
 
-        if($iduser == NULL || $idpage == NULL){
+        if($iduser === '' || $idpage === 0){
             printd("Visit is not on document page");
             printd("===================================================================");
             return;
@@ -158,7 +154,7 @@ class Piwik_PurplePlugin extends Piwik_Plugin
         $this->customizedUpdate = 0;;
         printd("PurplePlugin: KNWON Visitor: called!!");
         $visitorInfo = & $notification->getNotificationObject();
-//        printd("This is the visitorInfo:\n". var_export($visitorInfo, true));
+        printd("This is the visitorInfo:\n". var_export($visitorInfo, true));
 
         // Access data variable that contains iduser and idpage
         try{
@@ -168,20 +164,19 @@ class Piwik_PurplePlugin extends Piwik_Plugin
             printd("===================================================================");
             return;
         }
-        
         // Remove Quotes from string
-        $customdata = preg_replace("/[^a-zA-Z0-9,]+/", "", html_entity_decode($customdata, ENT_QUOTES));
+        $customdata = preg_replace("/[^a-zA-Z0-9, ]+/", "", html_entity_decode($customdata, ENT_QUOTES));
         // Split the data by delimiter 'comma'
         $customdata = explode(',', $customdata);
         //printd("[Purple Plugin] Found Custom Data: \n" . var_export($customdata, true));
         //First number is iduser
-        $iduser = isset($customdata[0]) ? $customdata[0] : null;
+        $iduser = isset($customdata[0]) ? mysql_real_escape_string($customdata[0]) : '';
         //Second Number is idpage
-        $idpage = isset($customdata[1]) ? $customdata[1] : null;
+        $idpage = isset($customdata[1]) ? (int) $customdata[1] : 0;
         //This is the siteId
         $idSite = isset($customdata[2]) ? $customdata[2] : 1;
 
-        if($iduser == NULL || $idpage == NULL){
+        if($iduser === '' || $idpage == 0){
             printd("Visit is not on document page");
             printd("===================================================================");
             return;
@@ -196,7 +191,7 @@ class Piwik_PurplePlugin extends Piwik_Plugin
         
         //select the row which is going to be updated and backup its data
         $query = "SELECT * FROM `".Piwik_Common::prefixTable('log_visit').
-                "` WHERE `idsite`={$idSite} AND `idvisitor`=x'".bin2hex($visitorInfo['idvisitor']).
+                "` WHERE `idsite`='{$idSite}' AND `idvisitor`=x'".bin2hex($visitorInfo['idvisitor']).
                 "' ORDER BY `visit_last_action_time` DESC LIMIT 1";
         ////printd("This is the query: ".$query);
         $this->rowBackup = Piwik_FetchAll($query);
@@ -210,8 +205,8 @@ class Piwik_PurplePlugin extends Piwik_Plugin
         //           if last action was within 30mins update it
         //           if last action was beyond 30mins set reviewUpdate true
         $query = "SELECT * FROM `".Piwik_Common::prefixTable('log_visit').
-                "` WHERE `idsite`={$idSite} AND `idvisitor`=x'".bin2hex($visitorInfo['idvisitor']).
-                "' AND `idpage`={$idpage} AND `iduser`={$iduser} ORDER BY `visit_last_action_time` DESC LIMIT 1";
+                "` WHERE `idsite`='{$idSite}' AND `idvisitor`=x'".bin2hex($visitorInfo['idvisitor']).
+                "' AND `idpage`='{$idpage}' AND `iduser`='{$iduser}' ORDER BY `visit_last_action_time` DESC LIMIT 1";
         
         ////printd("This is the query: ".$query);
         $this->currentrow = Piwik_FetchAll($query);
@@ -251,7 +246,7 @@ class Piwik_PurplePlugin extends Piwik_Plugin
             
             //First fetch new data and insert it into new row.
             $query = "SELECT * FROM `".Piwik_Common::prefixTable('log_visit').
-                "` WHERE `idvisit`={$visitorInfo['idvisit']} LIMIT 1";
+                "` WHERE `idvisit`='{$visitorInfo['idvisit']}' LIMIT 1";
             
             //printd('The First Select query is: '.$query);
             $result = Piwik_FetchAll($query);
@@ -285,7 +280,6 @@ class Piwik_PurplePlugin extends Piwik_Plugin
             $set = "";
             foreach($this->rowBackup[0] as $key => $value){
                 if($key=='idvisit')continue;
-                if($key=='pagetime' && $value==NULL) $value=0;
                 
                 //if a binary value appears convert it to hex first
                 if($key=='pagetime') {
@@ -296,7 +290,7 @@ class Piwik_PurplePlugin extends Piwik_Plugin
                     $set.= "`{$key}`='{$value}', ";
                 }
             }
-            $q = "UPDATE `".Piwik_Common::prefixTable('log_visit')."` SET {$set} WHERE `idvisit`={$prevRow}";
+            $q = "UPDATE `".Piwik_Common::prefixTable('log_visit')."` SET {$set} WHERE `idvisit`='{$prevRow}'";
             ////printd($q);
             if(Piwik_Query($q)>0){
                 printd("Query executed and data updated into table");
@@ -310,7 +304,7 @@ class Piwik_PurplePlugin extends Piwik_Plugin
             
             //First fetch new data and insert it into new row.
             $query = "SELECT * FROM `".Piwik_Common::prefixTable('log_visit').
-                "` WHERE `idvisit`={$visitorInfo['idvisit']} LIMIT 1";
+                "` WHERE `idvisit`='{$visitorInfo['idvisit']}' LIMIT 1";
             
 //            //printd('The First Select query is: '.$query);
             $result = Piwik_FetchAll($query);
@@ -338,7 +332,6 @@ class Piwik_PurplePlugin extends Piwik_Plugin
             $set = "";
             foreach($this->rowBackup[0] as $key => $value){
                 if($key=='idvisit')continue;
-                if($key=='pagetime' && $value==NULL) $value=0;
                 
                 //if a binary value appears convert it to hex first
                 if($key=='pagetime') {
@@ -349,7 +342,7 @@ class Piwik_PurplePlugin extends Piwik_Plugin
                     $set.= "`{$key}`='{$value}', ";
                 }
             }
-            $q = "UPDATE `".Piwik_Common::prefixTable('log_visit')."` SET {$set} WHERE `idvisit`={$visitorInfo['idvisit']}";
+            $q = "UPDATE `".Piwik_Common::prefixTable('log_visit')."` SET {$set} WHERE `idvisit`='{$visitorInfo['idvisit']}'";
             ////printd($q);
             if(Piwik_Query($q)>0){
                 printd("Query executed and data updated into table");
